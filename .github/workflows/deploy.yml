@@ -13,7 +13,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
@@ -21,15 +21,25 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel
 
-      - name: Deploy to Vercel
-        id: deploy
+      - name: Deploy to Vercel and print URL
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          DEPLOY_OUTPUT=$(vercel --prod --yes --token "${{ secrets.VERCEL_TOKEN }}" 2>&1)
+          set -e
+          echo "Deploying to Vercel..."
+          # Run vercel CLI (non-interactive)
+          DEPLOY_OUTPUT=$(vercel --prod --yes --token "$VERCEL_TOKEN" 2>&1 || true)
+          echo "----- Vercel CLI output -----"
           echo "$DEPLOY_OUTPUT"
-
+          echo "----------------------------"
+          # Try to extract a .vercel.app URL
           DEPLOY_URL=$(echo "$DEPLOY_OUTPUT" | grep -Eo 'https?://[^ ]+\.vercel\.app' | head -n 1 || true)
-
-          echo "deployment-url=$DEPLOY_URL" >> $GITHUB_OUTPUT
-
-      - name: Show Deployment URL
-        run: echo "Your site is live at: ${{ steps.deploy.outputs.deployment-url }}"
+          # Fallback: any HTTP-like URL from last lines
+          if [ -z "$DEPLOY_URL" ]; then
+            DEPLOY_URL=$(echo "$DEPLOY_OUTPUT" | grep -Eo 'https?://[^ ]+' | tail -n 1 || true)
+          fi
+          if [ -n "$DEPLOY_URL" ]; then
+            echo "Your site is live at: $DEPLOY_URL"
+          else
+            echo "Could not parse a deployment URL from Vercel output. Check the full logs above."
+          fi
