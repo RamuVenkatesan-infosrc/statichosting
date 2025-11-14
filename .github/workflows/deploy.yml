@@ -13,13 +13,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
       - name: Install Vercel CLI
         run: npm install -g vercel
 
       - name: Deploy to Vercel
         id: deploy
         run: |
-          DEPLOY_URL=$(vercel --prod --yes --token ${{ secrets.VERCEL_TOKEN }})
+          DEPLOY_OUTPUT=$(vercel --prod --yes --token "${{ secrets.VERCEL_TOKEN }}" 2>&1)
+          echo "$DEPLOY_OUTPUT"
+
+          DEPLOY_URL=$(echo "$DEPLOY_OUTPUT" | grep -Eo 'https?://[^ ]+\.vercel\.app' | head -n 1 || true)
+
           echo "deployment-url=$DEPLOY_URL" >> $GITHUB_OUTPUT
 
       - name: Show Deployment URL
